@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>App 50 Aniversario Scout</title>
+    
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
+    
+    <style>
+        :root { --primary: #4a148c; --secondary: #ffd600; --bank: #2c3e50; --text: #333; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f0f2f5; margin: 0; padding: 15px; color: var(--text); }
+        .container { background: white; padding: 25px; border-radius: 20px; max-width: 500px; margin: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.1); box-sizing: border-box; }
+        .logo-main { display: block; margin: 0 auto 10px; width: 90px; height: auto; }
+        .step { display: none; }
+        .step.active { display: block; }
+        h1 { font-size: 1.4rem; text-align: center; color: var(--primary); border-bottom: 3px solid var(--secondary); padding-bottom: 10px; }
+        label { display: block; margin-top: 15px; font-weight: bold; font-size: 0.9rem; color: var(--primary); }
+        input, select { width: 100%; padding: 14px; margin-top: 8px; border: 2px solid #ddd; border-radius: 10px; box-sizing: border-box; font-size: 16px; }
+        .comensal-input { background: #f9f9f9; border-left: 5px solid var(--secondary); margin-bottom: 10px; }
+        .comensal-input::placeholder { color: #999; font-style: italic; }
+        button { width: 100%; padding: 16px; margin-top: 20px; border: none; border-radius: 12px; background: var(--primary); color: white; font-weight: bold; font-size: 1.1rem; cursor: pointer; }
+        .info-pago { background: #f8f9fa; padding: 15px; border-radius: 15px; border: 2px dashed var(--bank); text-align: center; margin-top: 20px; }
+        .btn-copy { background: var(--bank); padding: 8px; font-size: 0.8rem; width: auto; margin-top: 10px; display: inline-block; }
+        .btn-banco { background: #fff; color: #d32f2f; border: 2px solid #d32f2f; margin-top: 10px; display: none; padding: 10px; font-size: 0.9rem; text-decoration: none; border-radius: 10px; align-items: center; justify-content: center; font-weight: bold; }
+        #loading { display:none; text-align:center; padding: 20px; color: #e65100; font-weight: bold; }
+        .admin-box { overflow-x: auto; margin-top: 20px; border-radius: 10px; background: #fff; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.75rem; }
+        th, td { padding: 10px; border: 1px solid #eee; text-align: left; }
+        th { background: var(--primary); color: white; }
+
+        /* Estilos de Entradas */
+        .ticket-card { width: 500px; height: 500px; margin: 20px auto; background-image: url('entradas cena.jpg'); background-size: contain; background-repeat: no-repeat; position: relative; background-color: white; border-radius: 10px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        .ticket-number { position: absolute; top: 38px; right: 42px; font-family: sans-serif; font-weight: bold; color: #8b1d1d; font-size: 1.2rem; }
+        .ticket-mini-name { position: absolute; top: 62px; right: 42px; font-family: sans-serif; font-size: 0.65rem; color: #8b1d1d; text-align: right; width: 120px; text-transform: uppercase; font-weight: bold; }
+        .ticket-name { position: absolute; bottom: 110px; width: 100%; text-align: center; font-family: 'Arial Black', sans-serif; font-size: 1.8rem; text-transform: uppercase; color: #2b0d0d; }
+
+        .verificacion-ok { background: #e8f5e9; border: 2px solid #2e7d32; border-radius: 12px; padding: 15px; margin-top: 15px; }
+        .verificacion-ok h4 { color: #2e7d32; margin: 0 0 8px 0; }
+        .verificacion-error { background: #ffebee; border: 2px solid #c62828; border-radius: 12px; padding: 15px; margin-top: 15px; }
+        .verificacion-error h4 { color: #c62828; margin: 0 0 8px 0; }
+        
+        /* Estilo del nuevo aviso de alergias */
+        #msgAlergias { display:none; text-align:center; padding: 20px; background: #fff3e0; border: 2px solid #ff9800; border-radius: 15px; margin-top: 20px; animation: fadeIn 0.5s; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <img src="logo.jpeg" class="logo-main" onerror="this.style.display='none'">
+    <h1>Cena 50 Aniversario</h1>
+
+    <div id="step1" class="step active">
+        <label>Responsable de la Reserva:</label>
+        <input type="text" id="respNombre" placeholder="Ej: Juan Garcia">
+        <label>Número de Entradas:</label>
+        <select id="numEnt" onchange="generarCamposComensales()">
+            <option value="1">1 Entrada (25€)</option>
+            <option value="2">2 Entradas (50€)</option>
+            <option value="3">3 Entradas (75€)</option>
+            <option value="4">4 Entradas (100€)</option>
+        </select>
+        <div id="contenedorComensales"></div>
+        
+        <div id="msgAlergias">
+            <h3 style="color:#e65100; margin:0 0 10px 0;">⚠️ ¡Importante!</h3>
+            <p style="font-weight:bold; font-size: 0.9rem; margin:0;">En caso de intolerancia alimentaria o alergia, ponerse en contacto con la organización.</p>
+        </div>
+
+        <button id="btnSiguiente" onclick="irAPaso2()">Siguiente: Datos Bancarios</button>
+        <button onclick="accesoAdmin()" style="background:none; color:#bbb; font-size:0.7rem; text-decoration:underline; margin-top:10px;">Panel Admin</button>
+    </div>
+
+    <div id="step2" class="step">
+        <div class="info-pago">
+            <p>Total a transferir: <strong id="valTotal"></strong>€</p>
+            <p style="margin: 5px 0; font-size: 0.9rem; font-weight: bold;">IBAN de destino:</p>
+            <h2 style="color:var(--bank); margin: 5px 0; font-size: 1.1rem; letter-spacing: 1px;">ES09 3060 0074 1123 2262 2123</h2>
+            <button class="btn-copy" onclick="copiarIban()">COPIAR IBAN</button>
+            <hr style="border: 0; border-top: 1px solid #ddd; margin: 15px 0;">
+            <p style="font-size:0.8rem;">Concepto OBLIGATORIO: <br><b id="valConcepto" style="color:#d32f2f; font-size: 1rem;"></b></p>
+            <button class="btn-copy" onclick="copiarConcepto()" style="background:#d32f2f">COPIAR CONCEPTO</button>
+            
+            <hr style="border: 0; border-top: 1px solid #ddd; margin: 15px 0;">
+            <label style="margin-top:0">Abrir mi banco (opcional):</label>
+            <select id="selectorBanco" onchange="prepararEnlaceBanco()">
+                <option value="">-- Selecciona tu banco --</option>
+                <option value="https://www.bancosantander.es/particulares">Santander</option>
+                <option value="https://www.caixabank.es/particular/home/particulares_es.html">CaixaBank</option>
+                <option value="https://www.bbva.es/personas.html">BBVA</option>
+                <option value="https://www.bancosabadell.com/cs/Satellite/SabWeb/">Sabadell</option>
+                <option value="https://www.bankinter.com/banca/inicio">Bankinter</option>
+                <option value="https://www.unicajabanco.es/es/particulares">Unicaja</option>
+                <option value="https://www.ing.es/">ING</option>
+                <option value="https://www.abanca.com/es/">Abanca</option>
+                <option value="https://www.cajarural.com/">Caja Rural</option>
+                <option value="https://www.cajamar.es/es/comun/acceso-clientes/">Cajamar</option>
+                <option value="https://www.kutxabank.es/cs/Satellite/kutxabank/es/particulares">Kutxabank</option>
+                <option value="https://www.ibercaja.es/particulares/">Ibercaja</option>
+                <option value="https://www.revolut.com/es-ES/">Revolut</option>
+            </select>
+            <a id="linkBanco" href="#" target="_blank" class="btn-banco">ACCEDER A BANCA ONLINE</a>
+        </div>
+
+        <label>Sube el justificante de transferencia:</label>
+        <input type="file" id="fotoBizum" accept="image/*">
+        <div id="loading">🕵️ Verificando datos del documento...</div>
+        <div id="resultadoVerificacion"></div>
+        <button id="btnValidar" onclick="analizarPago()">VALIDAR Y FINALIZAR</button>
+        <button onclick="cambiar(1)" style="background:#888;">Volver</button>
+    </div>
+
+    <div id="step3" class="step" style="text-align:center;">
+        <div style="border: 3px solid #2e7d32; padding: 25px; border-radius: 15px; background: #e8f5e9;">
+            <h2 style="color:#2e7d32;">✅ Registro Completado</h2>
+            <button onclick="imprimirEntradas()" style="background:#2e7d32;">IMPRIMIR MIS ENTRADAS</button>
+            <button onclick="location.reload()" style="background:#555; margin-top:10px;">Nueva Reserva</button>
+        </div>
+    </div>
+
+    <div id="stepAdmin" class="step">
+        <h3>📋 Panel de Control</h3>
+        <div class="admin-box"><table><thead><tr><th>Responsable</th><th>Pago</th><th>Asistentes</th><th>Doc</th></tr></thead><tbody id="bAdmin"></tbody></table></div>
+        <button onclick="resetearBaseDatos()" style="background:#d32f2f; margin-top:30px; font-size:0.8rem;">⚠️ RESETEAR BASE DE DATOS (BORRAR TODO)</button>
+        <button onclick="cambiar(1)" style="background:#333;">Cerrar</button>
+    </div>
+</div>
+
+<script>
+    const firebaseConfig = {
+        apiKey: "AIzaSyDPxmeX-6IQI3iQFRpNcCFdI8tBj0eCV6Q",
+        authDomain: "cenascoutsanjose.firebaseapp.com",
+        projectId: "cenascoutsanjose",
+        storageBucket: "cenascoutsanjose.firebasestorage.app",
+        messagingSenderId: "60451922845",
+        appId: "1:60451922845:web:a06c4b9f62dcad4d1b8574"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    let globalFoto = "";
+    let htmlFinalEntradas = "";
+    const CUENTA_OBJETIVO = "ES0930600074112322622123";
+
+    function generarCamposComensales() {
+        const n = document.getElementById('numEnt').value;
+        const cont = document.getElementById('contenedorComensales');
+        cont.innerHTML = '<label>Nombres de los asistentes:</label>';
+        for(let i=1; i<=n; i++) {
+            cont.innerHTML += `<input type="text" class="comensal-input" id="com_${i}" placeholder="Ej: Juan Garcia">`;
+        }
+    }
+    
+    window.onload = generarCamposComensales;
+
+    function cambiar(p) {
+        document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+        document.getElementById('step' + (p === 'Admin' ? 'Admin' : p)).classList.add('active');
+    }
+
+    // FUNCIÓN MODIFICADA CON PAUSA DE ALERGIAS
+    async function irAPaso2() {
+        const resp = document.getElementById('respNombre').value.trim();
+        const n = document.getElementById('numEnt').value;
+        const btn = document.getElementById('btnSiguiente');
+        
+        if(!resp) return alert("Falta nombre responsable.");
+        for(let i=1; i<=n; i++) {
+            if(!document.getElementById('com_'+i).value.trim()) return alert("Falta nombre del asistente " + i);
+        }
+
+        // Mostrar el mensaje de alergias
+        const msg = document.getElementById('msgAlergias');
+        msg.style.display = 'block';
+        btn.disabled = true;
+        btn.innerText = "Procesando...";
+
+        // Pausa de 4 segundos para lectura
+        await new Promise(resolve => setTimeout(resolve, 4000));
+
+        // Continuar
+        document.getElementById('valTotal').innerText = n * 25;
+        document.getElementById('valConcepto').innerText = `CenaAniversario ${n}Pax ${resp.toUpperCase()}`;
+        
+        msg.style.display = 'none';
+        btn.disabled = false;
+        btn.innerText = "Siguiente: Datos Bancarios";
+        cambiar(2);
+    }
+
+    function copiarIban() {
+        navigator.clipboard.writeText(CUENTA_OBJETIVO.replace(/\s/g, ''));
+        alert("IBAN copiado.");
+    }
+
+    function copiarConcepto() {
+        navigator.clipboard.writeText(document.getElementById('valConcepto').innerText);
+        alert("Concepto copiado.");
+    }
+
+    function prepararEnlaceBanco() {
+        const select = document.getElementById('selectorBanco');
+        const link = document.getElementById('linkBanco');
+        if(select.value !== "") {
+            link.href = select.value;
+            link.style.display = "flex";
+        } else {
+            link.style.display = "none";
+        }
+    }
+
+    document.getElementById('fotoBizum').addEventListener('change', function(e) {
+        const reader = new FileReader();
+        reader.onload = function() { globalFoto = reader.result; };
+        if(e.target.files[0]) reader.readAsDataURL(e.target.files[0]);
+        document.getElementById('resultadoVerificacion').innerHTML = '';
+    });
+
+    async function analizarPago() {
+        const fileInput = document.getElementById('fotoBizum');
+        if (!fileInput.files[0]) return alert("Sube una imagen del comprobante.");
+
+        const btn = document.getElementById('btnValidar');
+        const load = document.getElementById('loading');
+        const divResultado = document.getElementById('resultadoVerificacion');
+
+        btn.disabled = true;
+        load.style.display = 'block';
+        divResultado.innerHTML = '';
+
+        const resp = document.getElementById('respNombre').value.trim();
+        const n = parseInt(document.getElementById('numEnt').value);
+        const importeTotal = n * 25;
+
+        await analizarPagoFallback(resp, importeTotal);
+        
+        btn.disabled = false;
+        load.style.display = 'none';
+    }
+
+    async function analizarPagoFallback(resp, importeTotal) {
+        const fileInput = document.getElementById('fotoBizum');
+        const divResultado = document.getElementById('resultadoVerificacion');
+        try {
+            const { data: { text } } = await Tesseract.recognize(fileInput.files[0], 'spa');
+            const ocr = text.toLowerCase();
+            
+            const nombreParts = resp.toLowerCase().split(' ');
+            const nombreEncontrado = nombreParts.some(p => p.length > 2 && ocr.includes(p));
+            const importeEncontrado = ocr.includes(String(importeTotal));
+            const cuentaEncontrada = ocr.includes("2123") || ocr.includes("2262");
+
+            if (nombreEncontrado && importeEncontrado && cuentaEncontrada) {
+                divResultado.innerHTML = `
+                    <div class="verificacion-ok">
+                        <h4>✅ Comprobante verificado con éxito</h4>
+                        <p style="font-size:0.85rem;">Los datos coinciden con la reserva.</p>
+                    </div>`;
+                setTimeout(() => guardarEnGoogle(), 1200);
+            } else {
+                divResultado.innerHTML = `
+                    <div class="verificacion-error">
+                        <h4>❌ Comprobante no válido</h4>
+                        <p style="font-size:0.9rem; font-weight:bold; color:#c62828;">
+                            Los datos del comprobante no coinciden con su reserva (Nombre, Importe de ${importeTotal}€ o Cuenta Destino).
+                        </p>
+                        <p style="background:white; padding:10px; border-radius:8px; margin-top:10px; font-size:0.85rem;">
+                            Por favor, póngase en contacto con los organizadores para validar su reserva manualmente:<br>
+                            <strong>Teléfono: 661 732 037</strong>
+                        </p>
+                    </div>`;
+            }
+        } catch(e) {
+            alert("Error al procesar la imagen. Inténtalo de nuevo o contacta con el 661 732 037.");
+        }
+    }
+
+    async function guardarEnGoogle() {
+        const resp = document.getElementById('respNombre').value;
+        const n = parseInt(document.getElementById('numEnt').value);
+        const lista = [];
+        for(let i=1; i<=n; i++) lista.push(document.getElementById('com_'+i).value);
+
+        try {
+            await db.collection("reservas").add({
+                responsable: resp,
+                asistentes: lista,
+                foto: globalFoto,
+                total: n*25,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp()
+            });
+
+            const snapshot = await db.collection("reservas").get();
+            let contadorSerie = 0;
+            snapshot.forEach(doc => { 
+                if(doc.data().responsable !== resp) contadorSerie += (doc.data().asistentes ? doc.data().asistentes.length : 0);
+            });
+
+            htmlFinalEntradas = "";
+            lista.forEach((nom, i) => {
+                const numS = String(contadorSerie + i + 1).padStart(3, '0');
+                htmlFinalEntradas += `<div class="ticket-card"><div class="ticket-number">Nº ${numS}</div><div class="ticket-mini-name">${nom}</div><div class="ticket-name">${nom}</div></div>`;
+            });
+            cambiar(3);
+        } catch (e) { alert("Error al conectar con la base de datos."); }
+    }
+
+    function imprimirEntradas() {
+        const v = window.open('', '_blank');
+        v.document.write(`<html><head><style>
+            body { background:#f4f4f4; display:flex; flex-direction:column; align-items:center; padding:20px; }
+            .ticket-card { width:500px; height:500px; margin:20px auto; background-image:url('entradas cena.jpg'); background-size:contain; background-repeat:no-repeat; position:relative; background-color:white; border-radius:10px; -webkit-print-color-adjust:exact; }
+            .ticket-number { position:absolute; top:38px; right:42px; font-family:sans-serif; font-weight:bold; color:#8b1d1d; font-size:1.2rem; }
+            .ticket-mini-name { position:absolute; top:62px; right:42px; font-family:sans-serif; font-size:0.65rem; color:#8b1d1d; text-align:right; width:120px; text-transform:uppercase; font-weight:bold; }
+            .ticket-name { position:absolute; bottom:110px; width:100%; text-align:center; font-family:'Arial Black', sans-serif; font-size:1.8rem; text-transform:uppercase; color:#2b0d0d; }
+            @media print { .btn-print { display:none; } body { background:white; padding:0; } }
+        </style></head><body>
+        <button class="btn-print" onclick="window.print()" style="padding:20px; background:#4a148c; color:white; font-weight:bold; width:500px; border-radius:10px; border:none; cursor:pointer; margin-bottom:20px;">DESCARGAR / IMPRIMIR</button>
+        ${htmlFinalEntradas}</body></html>`);
+        v.document.close();
+    }
+
+    async function accesoAdmin() {
+        if(prompt("Clave:") === "SCOUT50") {
+            actualizarTablaAdmin();
+            cambiar('Admin');
+        }
+    }
+
+    async function actualizarTablaAdmin() {
+        const bAdmin = document.getElementById('bAdmin');
+        bAdmin.innerHTML = "Cargando..."; 
+        const snapshot = await db.collection("reservas").orderBy("timestamp").get();
+        bAdmin.innerHTML = "";
+        snapshot.forEach(doc => {
+            const r = doc.data();
+            bAdmin.innerHTML += `<tr><td><b>${r.responsable}</b></td><td>${r.total}€</td><td>${r.asistentes.join('<br>')}</td><td><button onclick="verFoto('${r.foto}')">Ver</button></td></tr>`;
+        });
+    }
+
+    async function resetearBaseDatos() {
+        if(confirm("¿ESTÁS SEGURO? Esto borrará TODAS las reservas de la base de datos y no se puede deshacer.")) {
+            if(confirm("Confirma por segunda vez: ¿Borrar todo definitivamente?")) {
+                const snapshot = await db.collection("reservas").get();
+                const batch = db.batch();
+                snapshot.forEach(doc => {
+                    batch.delete(doc.ref);
+                });
+                await batch.commit();
+                alert("Base de datos reseteada correctamente.");
+                actualizarTablaAdmin();
+            }
+        }
+    }
+
+    function verFoto(data) {
+        const v = window.open('', '_blank');
+        v.document.write(`<img src="${data}" style="width:100%">`);
+    }
+</script>
+</body>
+</html>
